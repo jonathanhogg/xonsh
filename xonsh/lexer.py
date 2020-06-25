@@ -342,11 +342,22 @@ def handle_token(state, token):
     st = token.string
     pymode = state["pymode"][-1][0]
     if not pymode:
-        if state["last"] is not None and state["last"].end != token.start:
+        last = state["last"]
+        if last is not None and last.end != token.start:
             cur = token.start
-            old = state["last"].end
+            old = last.end
             if cur[0] == old[0] and cur[1] > old[1]:
-                yield _new_token("WS", token.line[old[1] : cur[1]], old)
+                if last.type == ERRORTOKEN and last.string == "\\":
+                    yield _new_token("NAME", ' ', old)
+                    old = old[0], old[1] + 1
+                    last = None
+                if cur[1] > old[1]:
+                    yield _new_token("WS", token.line[old[1]:cur[1]], old)
+        if last is not None and last.type == ERRORTOKEN and last.string == "\\":
+            yield _new_token("NAME", "\\", last.start)
+        if typ == ERRORTOKEN and st == "\\":
+            state["last"] = token
+            return
     if (typ, st) in special_handlers:
         yield from special_handlers[(typ, st)](state, token)
     elif (typ, st) in token_map:
