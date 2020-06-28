@@ -28,6 +28,7 @@ from xonsh.tokenize import (
     ENCODING,
     ENDMARKER,
     NAME,
+    ESCAPE,
     ERRORTOKEN,
     GREATER,
     LESS,
@@ -262,6 +263,11 @@ def handle_redirect(state, token):
     yield from handle_token(state, next_tok)
 
 
+def handle_escape(state, token):
+    state["last"] = token
+    yield _new_token("NAME", token.string[1], token.start)
+
+
 def _make_matcher_handler(tok, typ, pymode, ender, handlers):
     matcher = (
         ")"
@@ -298,6 +304,7 @@ def special_handlers():
         GREATER: handle_redirect,
         RIGHTSHIFT: handle_redirect,
         IOREDIRECT: handle_redirect,
+        ESCAPE: handle_escape,
         (OP, "<"): handle_redirect,
         (OP, ">"): handle_redirect,
         (OP, ">>"): handle_redirect,
@@ -342,22 +349,11 @@ def handle_token(state, token):
     st = token.string
     pymode = state["pymode"][-1][0]
     if not pymode:
-        last = state["last"]
-        if last is not None and last.end != token.start:
+        if state["last"] is not None and state["last"].end != token.start:
             cur = token.start
-            old = last.end
+            old = state["last"].end
             if cur[0] == old[0] and cur[1] > old[1]:
-                if last.type == ERRORTOKEN and last.string == "\\":
-                    yield _new_token("NAME", ' ', old)
-                    old = old[0], old[1] + 1
-                    last = None
-                if cur[1] > old[1]:
-                    yield _new_token("WS", token.line[old[1]:cur[1]], old)
-        if last is not None and last.type == ERRORTOKEN and last.string == "\\":
-            yield _new_token("NAME", "\\", last.start)
-        if typ == ERRORTOKEN and st == "\\":
-            state["last"] = token
-            return
+                yield _new_token("WS", token.line[old[1] : cur[1]], old)
     if (typ, st) in special_handlers:
         yield from special_handlers[(typ, st)](state, token)
     elif (typ, st) in token_map:

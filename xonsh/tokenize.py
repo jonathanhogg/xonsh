@@ -149,6 +149,9 @@ N_TOKENS += 1
 ATEQUAL = N_TOKENS
 tok_name[N_TOKENS] = "ATEQUAL"
 N_TOKENS += 1
+ESCAPE = N_TOKENS
+tok_name[ESCAPE] = "ESCAPE"
+N_TOKENS += 1
 _xonsh_tokens = {
     "?": "QUESTION",
     "@=": "ATEQUAL",
@@ -258,6 +261,7 @@ Whitespace = r"[ \f\t]*"
 Comment = r"#[^\r\n]*"
 Ignore = Whitespace + tokany(r"\\\r?\n" + Whitespace) + maybe(Comment)
 Name_RE = r"\$?\w+"
+BareEscape = r"(?:\\.)"
 
 Hexnumber = r"0[xX](?:_?[0-9a-fA-F])+"
 Binnumber = r"0[bB](?:_?[01])+"
@@ -354,7 +358,7 @@ Operator = group(
 
 Bracket = "[][(){}]"
 Special = group(r"\r?\n", r"\.\.\.", r"[:;.,@]")
-Funny = group(Operator, Bracket, Special)
+Funny = group(Operator, Bracket, Special, BareEscape)
 
 PlainToken = group(IORedirect, Number, Funny, String, Name_RE, SearchPath)
 
@@ -1082,9 +1086,11 @@ def _tokenize(readline, encoding):
                 elif token == "\\\n" or token == "\\\r\n":  # continued stmt
                     continued = 1
                     yield TokenInfo(ERRORTOKEN, token, spos, epos, line)
-                elif initial == "\\":  # continued stmt
-                    # for cases like C:\\path\\to\\file
-                    continued = 1
+                elif initial == "\\":
+                    yield TokenInfo(ESCAPE, token, spos, epos, line)
+                # elif initial == "\\":  # continued stmt
+                #     # for cases like C:\\path\\to\\file
+                #     continued = 1
                 else:
                     if initial in "([{":
                         parenlev += 1
